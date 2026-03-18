@@ -9,45 +9,47 @@ export class GetTasksUseCase {
     const taskMap = new Map(tasks.map(t => [t.id, t]));
     const memo = new Map<string, boolean>();
 
-    const checkIsIndirectlyBlocked = (taskId: string, visited: Set<string>): boolean => {
-      // Si ya tenemos el resultado memoizado, lo devolvemos
-      if (memo.has(taskId)) return memo.get(taskId)!;
-      
-      // Evitar ciclos (safety check, ya deberían estar prevenidos)
-      if (visited.has(taskId)) return false;
-
+    const checkIsIndirectlyBlocked = (taskId: string): boolean => {
       const task = taskMap.get(taskId);
-      if (!task || !task.dependencies || task.dependencies === '') {
-        memo.set(taskId, false);
+      if (!task || task.status === 'BLOCKED') return false;
+
+      // Helper to check if any ancestor is BLOCKED
+      const hasBlockedAncestor = (id: string, visited: Set<string>): boolean => {
+        if (visited.has(id)) return false;
+        const t = taskMap.get(id);
+        if (!t || !t.dependencies || t.dependencies === '') return false;
+        
+        const dep = taskMap.get(t.dependencies);
+        if (dep?.status === 'BLOCKED') return true;
+        
+        visited.add(id);
+        return hasBlockedAncestor(t.dependencies, visited);
+      };
+
+      // Helper to check if any descendant is BLOCKED and starts before this task ends
+      const hasBlockedDescendant = (id: string, visited: Set<string>): boolean => {
+        if (visited.has(id)) return false;
+        const currentTask = taskMap.get(taskId); // The original task we are checking for
+        if (!currentTask) return false;
+
+        const children = tasks.filter(t => t.dependencies === id);
+        for (const child of children) {
+          // Temporal constraint: Child must start before parent ends to cause a block
+          if (child.status === 'BLOCKED' && child.start < currentTask.end) return true;
+          
+          visited.add(id);
+          if (hasBlockedDescendant(child.id, visited)) return true;
+        }
         return false;
-      }
+      };
 
-      const depId = task.dependencies;
-      const depTask = taskMap.get(depId);
-      
-      if (!depTask) {
-        memo.set(taskId, false);
-        return false;
-      }
-
-      // Si la dependencia directa está BLOCKED, esta tarea está indirectamente bloqueada
-      if (depTask.status === 'BLOCKED') {
-        memo.set(taskId, true);
-        return true;
-      }
-
-      // Si no, verificamos recursivamente si la dependencia está indirectamente bloqueada
-      const newVisited = new Set(visited);
-      newVisited.add(taskId);
-      const isDepIndirectlyBlocked = checkIsIndirectlyBlocked(depId, newVisited);
-      
-      memo.set(taskId, isDepIndirectlyBlocked);
-      return isDepIndirectlyBlocked;
+      return hasBlockedAncestor(taskId, new Set()) || hasBlockedDescendant(taskId, new Set());
     };
+
 
     return tasks.map(task => ({
       ...task,
-      isIndirectlyBlocked: checkIsIndirectlyBlocked(task.id, new Set())
+      isIndirectlyBlocked: checkIsIndirectlyBlocked(task.id)
     }));
   }
 }
