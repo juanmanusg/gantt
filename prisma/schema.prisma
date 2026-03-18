@@ -25,6 +25,8 @@ model Task {
   start          DateTime
   end            DateTime
   progress       Int      @default(0)      // Percentage 0 - 100
+  status               String   @default("NORMAL") 
+  blockingReason       String?
   type           String   @default("task") // "task" | "milestone" | "project"
   isDisabled     Boolean  @default(false)  // To lock certain tasks
   dependencies   String   @default("")     // string of comma separated ids, e.g. "task1,task2"
