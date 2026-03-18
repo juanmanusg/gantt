@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createTask } from '@/app/actions/gantt'
+import { TaskData } from './GanttChart'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ export default function NewTaskButton({
   tasks = [] 
 }: { 
   projectId: string, 
-  tasks?: any[] 
+  tasks?: TaskData[] 
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)

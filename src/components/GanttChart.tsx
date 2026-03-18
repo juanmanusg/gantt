@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import Gantt from 'frappe-gantt'
+import Gantt, { Task } from 'frappe-gantt'
 import { updateTask, deleteTask } from '@/app/actions/gantt'
 import { Trash2, Edit } from 'lucide-react'
 import {
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-type TaskData = {
+export type TaskData = {
   id: string
   name: string
   start: Date
@@ -31,7 +31,7 @@ type CtxMenu = { open: boolean; x: number; y: number; task: TaskData | null }
 
 export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const ganttRef = useRef<any>(null)
+  const ganttRef = useRef<Gantt | null>(null)
   const isInternalChange = useRef(false)
   // Keep a ref to always-fresh initialTasks for use inside native event listeners
   const tasksRef = useRef<TaskData[]>(initialTasks)
@@ -60,18 +60,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     }
   }, [ctx.open])
 
-  // Sync server data → refresh Gantt (skip if internal drag/progress change)
-  useEffect(() => {
-    if (!ganttRef.current || !isMounted) return
-    if (isInternalChange.current) { isInternalChange.current = false; return }
-    const rows = toFrappeTasks(initialTasks)
-    try { ganttRef.current.refresh(rows) } catch { initGantt() }
-  }, [initialTasks])
-
-  // Re-init when view changes or on first mount
-  useEffect(() => { if (isMounted) initGantt() }, [isMounted, view])
-
-  function toFrappeTasks(tasks: TaskData[]) {
+  const toFrappeTasks = useCallback((tasks: TaskData[]) => {
     return tasks.map(t => ({
       id: t.id,
       name: t.name,
@@ -80,22 +69,22 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
       progress: t.progress,
       dependencies: t.dependencies,
     }))
-  }
+  }, [])
 
-  function initGantt() {
+  const initGantt = useCallback(() => {
     if (!containerRef.current || initialTasks.length === 0) return
     try {
       containerRef.current.innerHTML = ''
       ganttRef.current = new Gantt(containerRef.current, toFrappeTasks(initialTasks), {
-        on_click: (task: any) => {
+        on_click: (task: Task) => {
           const found = tasksRef.current.find(t => t.id === task.id) ?? null
           setActiveTask(found)
         },
-        on_date_change: async (task: any, start: Date, end: Date) => {
+        on_date_change: async (task: Task, start: Date, end: Date) => {
           isInternalChange.current = true
           await updateTask(task.id, { start, end })
         },
-        on_progress_change: async (task: any, progress: number) => {
+        on_progress_change: async (task: Task, progress: number) => {
           isInternalChange.current = true
           await updateTask(task.id, { progress })
         },
@@ -109,7 +98,19 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     } catch (e) {
       console.warn('Gantt init error', e)
     }
-  }
+  }, [initialTasks, toFrappeTasks, view])
+
+  // Sync server data → refresh Gantt (skip if internal drag/progress change)
+  useEffect(() => {
+    if (!ganttRef.current || !isMounted) return
+    if (isInternalChange.current) { isInternalChange.current = false; return }
+    const rows = toFrappeTasks(initialTasks)
+    try { ganttRef.current.refresh(rows) } catch { initGantt() }
+  }, [initialTasks, isMounted, toFrappeTasks, initGantt])
+
+  // Re-init when view changes or on first mount
+  useEffect(() => { if (isMounted) initGantt() }, [isMounted, initGantt])
+
 
   // Use a stable ref so the native listener always reads fresh tasks
   const handleSvgContextMenu = useCallback((e: React.MouseEvent | Event) => {
