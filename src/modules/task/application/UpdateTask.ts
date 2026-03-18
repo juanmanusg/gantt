@@ -17,6 +17,30 @@ export class UpdateTaskUseCase {
     const currentTask = await this.taskRepository.findById(id);
     if (!currentTask) throw new Error('Task not found');
 
+    // Validar ciclos si se cambia la dependencia
+    if (data.dependencies !== undefined && data.dependencies !== '') {
+      if (data.dependencies === id) {
+        throw new Error('A task cannot depend on itself');
+      }
+
+      const allTasks = await this.taskRepository.findByProjectId(currentTask.projectId);
+      const tasksMap = new Map(allTasks.map(t => [t.id, t]));
+      
+      let currentDepId = data.dependencies;
+      const visited = new Set<string>();
+      visited.add(id);
+
+      while (currentDepId && currentDepId !== '') {
+        if (visited.has(currentDepId)) {
+          throw new Error('Cycle detected in dependencies');
+        }
+        visited.add(currentDepId);
+        const parentTask = tasksMap.get(currentDepId);
+        if (!parentTask || !parentTask.dependencies) break;
+        currentDepId = parentTask.dependencies;
+      }
+    }
+
     const updatedData = { ...data };
 
     // Si se actualiza la dependencia o el porcentaje, recalculamos fechas

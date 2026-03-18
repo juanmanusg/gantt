@@ -11,6 +11,7 @@ export interface Task {
   dependencies: string;
   dependencyPercentage: number;
   projectId: string;
+  isIndirectlyBlocked?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
