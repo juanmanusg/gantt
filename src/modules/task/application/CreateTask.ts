@@ -9,6 +9,8 @@ export class CreateTaskUseCase {
     start: Date;
     end: Date;
     progress?: number;
+    status?: string;
+    blockingReason?: string;
     type?: string;
     dependencies?: string;
     dependencyPercentage?: number;
@@ -36,6 +38,8 @@ export class CreateTaskUseCase {
       start: startDate,
       end: data.end,
       progress: data.progress ?? 0,
+      status: data.status ?? 'NORMAL',
+      blockingReason: data.blockingReason,
       type: data.type ?? 'task',
       dependencies: data.dependencies ?? '',
       dependencyPercentage: dependencyPercentage,

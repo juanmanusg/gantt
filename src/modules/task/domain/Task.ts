@@ -4,6 +4,8 @@ export interface Task {
   start: Date;
   end: Date;
   progress: number;
+  status: string;
+  blockingReason?: string;
   type: string;
   isDisabled: boolean;
   dependencies: string;

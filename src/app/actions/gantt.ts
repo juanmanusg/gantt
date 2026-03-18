@@ -40,6 +40,8 @@ export async function createTask(data: {
   start: Date
   end: Date
   progress?: number
+  status?: string
+  blockingReason?: string
   type?: string
   dependencies?: string
   dependencyPercentage?: number
@@ -55,6 +57,8 @@ export async function updateTask(id: string, data: Partial<{
   start: Date
   end: Date
   progress: number
+  status: string
+  blockingReason: string
   dependencies: string
   dependencyPercentage: number
 }>) {

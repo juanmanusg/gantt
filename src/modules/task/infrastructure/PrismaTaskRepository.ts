@@ -25,6 +25,8 @@ export class PrismaTaskRepository implements TaskRepository {
         start: data.start,
         end: data.end,
         progress: data.progress,
+        status: data.status,
+        blockingReason: data.blockingReason,
         type: data.type,
         dependencies: data.dependencies,
         dependencyPercentage: data.dependencyPercentage,

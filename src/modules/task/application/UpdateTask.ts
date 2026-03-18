@@ -9,6 +9,8 @@ export class UpdateTaskUseCase {
     start: Date;
     end: Date;
     progress: number;
+    status: string;
+    blockingReason: string;
     dependencies: string;
     dependencyPercentage: number;
   }>): Promise<Task> {
