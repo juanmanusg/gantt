@@ -72,10 +72,17 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
   }, [])
 
   const initGantt = useCallback(() => {
-    if (!containerRef.current || initialTasks.length === 0) return
+    if (!containerRef.current || tasksRef.current.length === 0) return
+    
+    // Preserve scroll position before cleanup
+    const scrollPos = containerRef.current.scrollLeft
+    
     try {
+      // ONLY clear innerHTML if we are changing view or mounting
+      // Avoid clearing if we just want to update data
       containerRef.current.innerHTML = ''
-      ganttRef.current = new Gantt(containerRef.current, toFrappeTasks(initialTasks), {
+      
+      ganttRef.current = new Gantt(containerRef.current, toFrappeTasks(tasksRef.current), {
         on_click: (task: Task) => {
           const found = tasksRef.current.find(t => t.id === task.id) ?? null
           setActiveTask(found)
@@ -94,18 +101,41 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
         padding: 18,
         header_height: 60,
         custom_popup_html: null,
-      })
+        // Disable internal auto-scroll to avoid jumps
+        scroll_to: null,
+      } as any)
+      
+      // Restore scroll position
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollLeft = scrollPos
+        }
+      }, 10)
     } catch (e) {
       console.warn('Gantt init error', e)
     }
-  }, [initialTasks, toFrappeTasks, view])
+  }, [toFrappeTasks, view]) // Removed initialTasks from dependencies
 
   // Sync server data → refresh Gantt (skip if internal drag/progress change)
   useEffect(() => {
     if (!ganttRef.current || !isMounted) return
     if (isInternalChange.current) { isInternalChange.current = false; return }
+    
+    // Preserve scroll position
+    const scrollPos = containerRef.current?.scrollLeft || 0
+    
     const rows = toFrappeTasks(initialTasks)
-    try { ganttRef.current.refresh(rows) } catch { initGantt() }
+    try { 
+      ganttRef.current.refresh(rows)
+      // Restore scroll after a small delay to ensure internal rendering is done
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollLeft = scrollPos
+        }
+      }, 50)
+    } catch { 
+      initGantt() 
+    }
   }, [initialTasks, isMounted, toFrappeTasks, initGantt])
 
   // Re-init when view changes or on first mount
