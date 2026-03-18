@@ -27,6 +27,23 @@
   font-size: 12px !important;
 }
 
+.bar-blocked { 
+  fill: #f97316 !important; 
+}
+
+.bar-blocked .bar-progress {
+  fill: #ea580c !important;
+}
+
+.bar-indirect-blocked { 
+  fill: url(#diagonalHatch) !important; 
+}
+
+.bar-indirect-blocked .bar-progress {
+  fill: #f97316 !important;
+  opacity: 0.5;
+}
+
 .gantt-wrapper .grid-header {
   fill: #f8fafc !important;
   stroke: #e2e8f0 !important;

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Gantt, { Task } from 'frappe-gantt'
 import { updateTask, deleteTask } from '@/app/actions/gantt'
-import { Trash2, Edit } from 'lucide-react'
+import { Trash2, Edit, AlertTriangle, CheckCircle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,8 @@ export type TaskData = {
   isDisabled: boolean
   dependencies: string
   dependencyPercentage: number
+  status: string
+  isIndirectlyBlocked?: boolean
 }
 
 type CtxMenu = { open: boolean; x: number; y: number; task: TaskData | null }
@@ -61,14 +63,38 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
   }, [ctx.open])
 
   const toFrappeTasks = useCallback((tasks: TaskData[]) => {
-    return tasks.map(t => ({
-      id: t.id,
-      name: t.name,
-      start: t.start.toISOString().split('T')[0],
-      end: t.end.toISOString().split('T')[0],
-      progress: t.progress,
-      dependencies: t.dependencies,
-    }))
+    return tasks.map(t => {
+      let customClass = ''
+      if (t.status === 'BLOCKED') customClass = 'bar-blocked'
+      else if (t.isIndirectlyBlocked) customClass = 'bar-indirect-blocked'
+
+      return {
+        id: t.id,
+        name: t.name,
+        start: t.start.toISOString().split('T')[0],
+        end: t.end.toISOString().split('T')[0],
+        progress: t.progress,
+        dependencies: t.dependencies,
+        custom_class: customClass,
+        // Block interaction if the task is blocked or indirectly blocked
+        isDisabled: t.isDisabled || t.status === 'BLOCKED' || !!t.isIndirectlyBlocked
+      }
+    })
+  }, [])
+
+  const injectPatterns = useCallback(() => {
+    if (!containerRef.current) return
+    const svg = containerRef.current.querySelector('svg')
+    if (svg && !svg.querySelector('#diagonalHatch')) {
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+      defs.innerHTML = `
+        <pattern id="diagonalHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" fill="#f97316" />
+          <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="#ea580c" stroke-width="2.5" />
+        </pattern>
+      `
+      svg.prepend(defs)
+    }
   }, [])
 
   const initGantt = useCallback(() => {
@@ -104,6 +130,9 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
         // Disable internal auto-scroll to avoid jumps
         scroll_to: null,
       } as any)
+
+      // Inject SVG patterns for hashed bars (blocking)
+      injectPatterns()
       
       // Restore scroll position
       setTimeout(() => {
@@ -114,7 +143,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     } catch (e) {
       console.warn('Gantt init error', e)
     }
-  }, [toFrappeTasks, view]) // Removed initialTasks from dependencies
+  }, [toFrappeTasks, view, injectPatterns]) // Removed initialTasks from dependencies
 
   // Sync server data → refresh Gantt (skip if internal drag/progress change)
   useEffect(() => {
@@ -127,6 +156,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     const rows = toFrappeTasks(initialTasks)
     try { 
       ganttRef.current.refresh(rows)
+      injectPatterns()
       // Restore scroll after a small delay to ensure internal rendering is done
       setTimeout(() => {
         if (containerRef.current) {
@@ -136,7 +166,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     } catch { 
       initGantt() 
     }
-  }, [initialTasks, isMounted, toFrappeTasks, initGantt])
+  }, [initialTasks, isMounted, toFrappeTasks, initGantt, injectPatterns])
 
   // Re-init when view changes or on first mount
   useEffect(() => { if (isMounted) initGantt() }, [isMounted, initGantt])
@@ -166,6 +196,15 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     setCtx(m => ({ ...m, open: false }))
     await deleteTask(task.id)
     setActiveTask(null)
+  }
+
+  const toggleBlocking = async (task: TaskData) => {
+    setCtx(m => ({ ...m, open: false }))
+    if (task.status === 'BLOCKED') {
+      await updateTask(task.id, { status: 'NORMAL', blockingReason: '' })
+    } else {
+      await updateTask(task.id, { status: 'BLOCKED', blockingReason: 'Tarea bloqueada' })
+    }
   }
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -248,6 +287,28 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
                 <Edit className="h-4 w-4 text-blue-500 shrink-0" />
                 Editar tarea
               </button>
+              
+              <button
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${
+                  ctx.task.status === 'BLOCKED' 
+                    ? 'text-green-600 hover:bg-green-50' 
+                    : 'text-orange-600 hover:bg-orange-50'
+                }`}
+                onClick={() => toggleBlocking(ctx.task!)}
+              >
+                {ctx.task.status === 'BLOCKED' ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 shrink-0" />
+                    Resolver Bloqueo
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Informar Bloqueo
+                  </>
+                )}
+              </button>
+
               <div className="h-px bg-gray-100" />
               <button
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
