@@ -1,13 +1,38 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// prisma/schema.prisma
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  tasks       Task[]
+}
+
+model Task {
+  id             String   @id @default(cuid())
+  name           String
+  start          DateTime
+  end            DateTime
+  progress       Int      @default(0)      // Percentage 0 - 100
+  type           String   @default("task") // "task" | "milestone" | "project"
+  isDisabled     Boolean  @default(false)  // To lock certain tasks
+  dependencies   String   @default("")     // string of comma separated ids, e.g. "task1,task2"
+  dependencyPercentage Int  @default(100)   // Start when parent is at X% (0-100)
+  
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
