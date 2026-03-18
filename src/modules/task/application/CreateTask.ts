@@ -39,7 +39,7 @@ export class CreateTaskUseCase {
       end: data.end,
       progress: data.progress ?? 0,
       status: data.status ?? 'NORMAL',
-      blockingReason: data.blockingReason,
+      blockingReason: data.blockingReason ?? null,
       type: data.type ?? 'task',
       dependencies: data.dependencies ?? '',
       dependencyPercentage: dependencyPercentage,

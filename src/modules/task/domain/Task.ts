@@ -5,7 +5,7 @@ export interface Task {
   end: Date;
   progress: number;
   status: string;
-  blockingReason?: string;
+  blockingReason: string | null;
   type: string;
   isDisabled: boolean;
   dependencies: string;

@@ -27,19 +27,20 @@
   font-size: 12px !important;
 }
 
-.bar-blocked { 
-  fill: #f97316 !important; 
+/* Blocking States with high specificity */
+.gantt-wrapper .bar-blocked .bar {
+  fill: #f97316 !important;
 }
 
-.bar-blocked .bar-progress {
+.gantt-wrapper .bar-blocked .bar-progress {
   fill: #ea580c !important;
 }
 
-.bar-indirect-blocked { 
-  fill: url(#diagonalHatch) !important; 
+.gantt-wrapper .bar-indirect-blocked .bar {
+  fill: url(#diagonalHatch) !important;
 }
 
-.bar-indirect-blocked .bar-progress {
+.gantt-wrapper .bar-indirect-blocked .bar-progress {
   fill: #f97316 !important;
   opacity: 0.5;
 }

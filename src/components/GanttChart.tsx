@@ -83,18 +83,21 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
   }, [])
 
   const injectPatterns = useCallback(() => {
-    if (!containerRef.current) return
-    const svg = containerRef.current.querySelector('svg')
-    if (svg && !svg.querySelector('#diagonalHatch')) {
-      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
-      defs.innerHTML = `
-        <pattern id="diagonalHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="8" height="8" fill="#f97316" />
-          <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="#ea580c" stroke-width="2.5" />
-        </pattern>
-      `
-      svg.prepend(defs)
-    }
+    // Small delay to ensure SVG is in the DOM
+    setTimeout(() => {
+      if (!containerRef.current) return
+      const svg = containerRef.current.querySelector('svg')
+      if (svg && !svg.querySelector('#diagonalHatch')) {
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+        defs.innerHTML = `
+          <pattern id="diagonalHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="#f97316" />
+            <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="#ea580c" stroke-width="2.5" />
+          </pattern>
+        `
+        svg.prepend(defs)
+      }
+    }, 50)
   }, [])
 
   const initGantt = useCallback(() => {
