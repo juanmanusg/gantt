@@ -65,7 +65,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     if (!ganttRef.current || !isMounted) return
     if (isInternalChange.current) { isInternalChange.current = false; return }
     const rows = toFrappeTasks(initialTasks)
-    try { ganttRef.current.refresh(rows); applyStyles() } catch { initGantt() }
+    try { ganttRef.current.refresh(rows) } catch { initGantt() }
   }, [initialTasks])
 
   // Re-init when view changes or on first mount
@@ -106,62 +106,13 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
         header_height: 60,
         custom_popup_html: null,
       })
-      applyStyles()
-      attachContextMenu()
     } catch (e) {
       console.warn('Gantt init error', e)
     }
   }
 
-  function applyStyles() {
-    setTimeout(() => {
-      const svg = containerRef.current?.querySelector('svg')
-      if (!svg) return
-      // Text color
-      svg.querySelectorAll('text').forEach((el: any) => {
-        el.style.fill = '#1e293b'
-        el.style.fontWeight = '600'
-      })
-      // Bar colors
-      svg.querySelectorAll('.bar').forEach((el: any) => {
-        el.style.fill = '#3b82f6'
-        el.setAttribute('fill', '#3b82f6')
-      })
-      svg.querySelectorAll('.bar-progress').forEach((el: any) => {
-        el.style.fill = '#1d4ed8'
-        el.setAttribute('fill', '#1d4ed8')
-      })
-      // Dependency arrows
-      tasksRef.current.forEach(task => {
-        if (!task.dependencies || task.dependencyPercentage === undefined) return
-        const arrow = svg.querySelector(`[data-from-id="${task.dependencies}"][data-to-id="${task.id}"] path`) as SVGPathElement | null
-        const parentBar = svg.querySelector(`[data-id="${task.dependencies}"] .bar`) as SVGRectElement | null
-        if (!arrow || !parentBar) return
-        const w = parseFloat(parentBar.getAttribute('width') || '0')
-        const x = parseFloat(parentBar.getAttribute('x') || '0')
-        const nx = x + w * (task.dependencyPercentage / 100)
-        const d = arrow.getAttribute('d') || ''
-        const p = d.split(/[, ]+/)
-        if (p.length > 2) {
-          arrow.setAttribute('d', `M ${nx} ${p[2]} ${d.substring(d.indexOf(p[3] || ''))}`)
-          if (task.dependencyPercentage < 100) arrow.setAttribute('stroke-dasharray', '4,4')
-        }
-      })
-    }, 60)
-  }
-
-  function attachContextMenu() {
-    setTimeout(() => {
-      const svg = containerRef.current?.querySelector('svg')
-      if (!svg) return
-
-      // Remove any previously attached listener by cloning? No—use a named function via ref
-      svg.addEventListener('contextmenu', handleSvgContextMenu)
-    }, 100)
-  }
-
   // Use a stable ref so the native listener always reads fresh tasks
-  const handleSvgContextMenu = useCallback((e: Event) => {
+  const handleSvgContextMenu = useCallback((e: React.MouseEvent | Event) => {
     const me = e as MouseEvent
     const target = me.target as SVGElement
 
@@ -236,7 +187,11 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
 
       {/* Gantt container — no overflow-hidden so fixed menu can escape */}
       <div className="relative border rounded-xl bg-white shadow-inner">
-        <div ref={containerRef} className="gantt-wrapper min-h-[400px]" />
+        <div 
+          ref={containerRef} 
+          className="gantt-wrapper min-h-[400px]" 
+          onContextMenu={handleSvgContextMenu}
+        />
       </div>
 
       {/* Custom context menu */}
@@ -278,21 +233,6 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
           )}
         </div>
       )}
-
-      {/* Global Gantt styles */}
-      <style jsx global>{`
-        .gantt-wrapper .details-container,
-        .gantt-wrapper .popup-wrapper { display: none !important; }
-        .gantt-wrapper svg text { font-family: inherit !important; }
-        .gantt-wrapper .bar { fill: #3b82f6 !important; rx: 4; ry: 4; }
-        .gantt-wrapper .bar-progress { fill: #1d4ed8 !important; }
-        .gantt-wrapper .bar-label { fill: #ffffff !important; font-weight: 500 !important; font-size: 12px !important; }
-        .gantt-wrapper .grid-header { fill: #f8fafc !important; stroke: #e2e8f0 !important; }
-        .gantt-wrapper .today-highlight { fill: #fef08a !important; opacity: 0.3 !important; }
-        .gantt-wrapper .arrow { stroke: #94a3b8 !important; stroke-width: 1.5 !important; }
-        .gantt-wrapper .lower-text,
-        .gantt-wrapper .upper-text { fill: #475569 !important; font-size: 12px !important; }
-      `}</style>
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
