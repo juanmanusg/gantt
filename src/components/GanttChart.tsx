@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Gantt, { Task } from 'frappe-gantt'
 import { updateTask, deleteTask } from '@/app/actions/gantt'
-import { Trash2, Edit, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Trash2, Edit, AlertTriangle, CheckCircle, Info, Calendar, Activity, FileText, AlertCircle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,9 @@ export type TaskData = {
   dependencyPercentage: number
   status: string
   isIndirectlyBlocked?: boolean
+  isLeaf?: boolean
+  blockingReason?: string | null
+  blockingSources?: { id: string; name: string; reason: string | null }[]
 }
 
 type CtxMenu = { open: boolean; x: number; y: number; task: TaskData | null }
@@ -44,6 +47,10 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
   const [activeTask, setActiveTask] = useState<TaskData | null>(null)
   const [ctx, setCtx] = useState<CtxMenu>({ open: false, x: 0, y: 0, task: null })
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const [isBlockingPromptOpen, setIsBlockingPromptOpen] = useState(false)
+  const [blockingPromptTask, setBlockingPromptTask] = useState<TaskData | null>(null)
+  const [blockingReasonInput, setBlockingReasonInput] = useState('')
   const [editingTask, setEditingTask] = useState<TaskData | null>(null)
   const [editLoading, setEditLoading] = useState(false)
 
@@ -114,7 +121,10 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
       ganttRef.current = new Gantt(containerRef.current, toFrappeTasks(tasksRef.current), {
         on_click: (task: Task) => {
           const found = tasksRef.current.find(t => t.id === task.id) ?? null
-          setActiveTask(found)
+          if (found) {
+            setActiveTask(found)
+            setIsInfoOpen(true)
+          }
         },
         on_date_change: async (task: Task, start: Date, end: Date) => {
           isInternalChange.current = true
@@ -132,7 +142,7 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
         custom_popup_html: null,
         // Disable internal auto-scroll to avoid jumps
         scroll_to: null,
-      } as any)
+      } as any) // We keep any for the custom 'scroll_to' option as it's not in the official d.ts but exists in the JS source
 
       // Inject SVG patterns for hashed bars (blocking)
       injectPatterns()
@@ -206,7 +216,26 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
     if (task.status === 'BLOCKED') {
       await updateTask(task.id, { status: 'NORMAL', blockingReason: '' })
     } else {
-      await updateTask(task.id, { status: 'BLOCKED', blockingReason: 'Tarea bloqueada' })
+      setBlockingPromptTask(task)
+      setBlockingReasonInput('')
+      setIsBlockingPromptOpen(true)
+    }
+  }
+
+  const confirmBlocking = async () => {
+    if (!blockingPromptTask) return
+    setEditLoading(true)
+    try {
+      await updateTask(blockingPromptTask.id, { 
+        status: 'BLOCKED', 
+        blockingReason: blockingReasonInput || 'Sin motivo especificado' 
+      })
+      setIsBlockingPromptOpen(false)
+      setBlockingPromptTask(null)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -291,35 +320,34 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
                 Editar tarea
               </button>
               
-              <button
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${
-                  ctx.task.status === 'BLOCKED' 
-                    ? 'text-green-600 hover:bg-green-50' 
-                    : 'text-orange-600 hover:bg-orange-50'
-                }`}
-                onClick={() => toggleBlocking(ctx.task!)}
-              >
-                {ctx.task.status === 'BLOCKED' ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 shrink-0" />
-                    Resolver Bloqueo
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    Informar Bloqueo
-                  </>
-                )}
-              </button>
+              {ctx.task.status === 'BLOCKED' ? (
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left text-green-600 hover:bg-green-50"
+                  onClick={() => toggleBlocking(ctx.task!)}
+                >
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  Resolver Bloqueo
+                </button>
+              ) : ctx.task.isLeaf && (
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left text-orange-600 hover:bg-orange-50"
+                  onClick={() => toggleBlocking(ctx.task!)}
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Informar Bloqueo
+                </button>
+              )}
 
               <div className="h-px bg-gray-100" />
-              <button
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                onClick={() => doDelete(ctx.task!)}
-              >
-                <Trash2 className="h-4 w-4 shrink-0" />
-                Eliminar tarea
-              </button>
+              {ctx.task.isLeaf && (
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                  onClick={() => doDelete(ctx.task!)}
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  Eliminar tarea
+                </button>
+              )}
             </>
           ) : (
             <div className="px-4 py-5 text-xs text-gray-400 text-center italic">
@@ -328,6 +356,125 @@ export default function GanttChart({ initialTasks }: { initialTasks: TaskData[] 
           )}
         </div>
       )}
+
+      {/* Info Dialog */}
+      <Dialog open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Info className="h-5 w-5 text-blue-500" />
+              Información de la Tarea
+            </DialogTitle>
+          </DialogHeader>
+          {activeTask && (
+            <div className="space-y-6 py-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre</label>
+                <div className="text-lg font-semibold text-gray-800">{activeTask.name}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <Calendar className="h-3 w-3" /> Inicio
+                  </label>
+                  <div className="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border">{activeTask.start.toLocaleDateString('es-ES')}</div>
+                </div>
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <Calendar className="h-3 w-3" /> Fin
+                  </label>
+                  <div className="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border">{activeTask.end.toLocaleDateString('es-ES')}</div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <Activity className="h-3 w-3" /> Progreso ({activeTask.progress}%)
+                </label>
+                <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden border">
+                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${activeTask.progress}%` }} />
+                </div>
+              </div>
+
+              {activeTask.status === 'BLOCKED' && (
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-orange-700 font-bold text-xs uppercase tracking-tight">
+                    <AlertTriangle className="h-4 w-4" /> Bloqueo Directo
+                  </div>
+                  <div className="text-sm text-orange-800 bg-white/50 p-3 rounded-lg border border-orange-100 italic">
+                    &quot;{activeTask.blockingReason || 'Sin motivo especificado'}&quot;
+                  </div>
+                </div>
+              )}
+
+              {activeTask.isIndirectlyBlocked && activeTask.blockingSources && activeTask.blockingSources.length > 0 && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                  <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-tight">
+                    <AlertCircle className="h-4 w-4" /> Bloqueo Indirecto por Sucesores
+                  </div>
+                  <div className="space-y-2">
+                    {activeTask.blockingSources.map(source => (
+                      <div key={source.id} className="text-xs bg-white/60 p-3 rounded-lg border border-red-100">
+                        <div className="font-bold text-red-800 mb-1 flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          {source.name}
+                        </div>
+                        <div className="text-red-700 italic ml-3">&quot;{source.reason || 'Sin motivo especificado'}&quot;</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <Button variant="outline" className="w-full" onClick={() => setIsInfoOpen(false)}>Cerrar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Blocking Prompt Dialog */}
+      <Dialog open={isBlockingPromptOpen} onOpenChange={setIsBlockingPromptOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              Informar Bloqueo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-500">
+              Estás informando un bloqueo para <span className="font-bold text-gray-700">{blockingPromptTask?.name}</span>.
+              Por favor, indica el motivo del bloqueo.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="blocking-reason" className="flex items-center gap-1.5">
+                <FileText className="h-3 w-3" /> Motivo del bloqueo
+              </Label>
+              <Input
+                id="blocking-reason"
+                placeholder="Ej: Retraso en suministro de materiales..."
+                value={blockingReasonInput}
+                onChange={e => setBlockingReasonInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsBlockingPromptOpen(false)}>Cancelar</Button>
+              <Button 
+                variant="destructive" 
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={confirmBlocking}
+                disabled={editLoading}
+              >
+                {editLoading ? 'Guardando...' : 'Bloquear Tarea'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

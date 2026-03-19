@@ -17,6 +17,18 @@ export class UpdateTaskUseCase {
     const currentTask = await this.taskRepository.findById(id);
     if (!currentTask) throw new Error('Task not found');
 
+    // Validar que solo se puedan bloquear tareas hoja
+    if (data.status === 'BLOCKED') {
+      const allTasks = await this.taskRepository.findByProjectId(currentTask.projectId);
+      const isLeaf = !allTasks.some(t => {
+        const deps = t.dependencies.split(',').filter(d => d.trim() !== '');
+        return deps.includes(id);
+      });
+      if (!isLeaf) {
+        throw new Error('Solo se pueden bloquear tareas que no tengan sucesores (tareas hoja)');
+      }
+    }
+
     // Validar ciclos si se cambia la dependencia
     if (data.dependencies !== undefined && data.dependencies !== '') {
       if (data.dependencies === id) {

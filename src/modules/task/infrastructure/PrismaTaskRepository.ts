@@ -36,9 +36,13 @@ export class PrismaTaskRepository implements TaskRepository {
   }
 
   async update(id: string, data: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'projectId'>>): Promise<Task> {
+    // Clean data to only include fields that exist in the database schema
+    const dbData = { ...data };
+    delete (dbData as any).isIndirectlyBlocked;
+    
     return await this.prisma.task.update({
       where: { id },
-      data
+      data: dbData as any
     });
   }
 

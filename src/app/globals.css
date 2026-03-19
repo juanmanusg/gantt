@@ -27,22 +27,21 @@
   font-size: 12px !important;
 }
 
-/* Blocking States with high specificity */
+/* Blocking States - These win because the selectors are more specific */
 .gantt-wrapper .bar-blocked .bar {
-  fill: #f97316 !important;
+  fill: #ef4444 !important; /* Red for direct block */
 }
 
 .gantt-wrapper .bar-blocked .bar-progress {
-  fill: #ea580c !important;
+  fill: #b91c1c !important;
 }
 
 .gantt-wrapper .bar-indirect-blocked .bar {
-  fill: url(#diagonalHatch) !important;
+  fill: #f59e0b !important; /* Amber/Orange for indirect block */
 }
 
 .gantt-wrapper .bar-indirect-blocked .bar-progress {
-  fill: #f97316 !important;
-  opacity: 0.5;
+  fill: #d97706 !important;
 }
 
 .gantt-wrapper .grid-header {
